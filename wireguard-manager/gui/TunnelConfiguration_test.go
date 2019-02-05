@@ -15,7 +15,7 @@ Address = 10.192.122.1/24
 Address = 10.10.0.1/16 
 SaveConfig = true 
 PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk= 
-ListenPort = 51820
+ListenPort = 51820  #comments don't matter
 
 [Peer] 
 PublicKey   =   xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=    

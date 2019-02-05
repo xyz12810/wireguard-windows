@@ -60,13 +60,14 @@ func readTunnelConfiguration(wgQuickConfig string, called string) (TunnelConfigu
 	attributes := make(map[string]string)
 	peers := make([]PeerConfiguration, 0)
 	for lineIndex, line := range lines {
-		trimmedLine := strings.ToLower(strings.TrimSpace(strings.Split(line, "#")[0]))
+		trimmedLine := strings.TrimSpace(strings.Split(line, "#")[0])
+		trimmedLineLower := strings.ToLower(trimmedLine)
 		if len(trimmedLine) > 0 {
-			equalsIndex := strings.Index(line, "=")
+			equalsIndex := strings.Index(trimmedLine, "=")
 			if equalsIndex > 0 {
-				keyWithCase := strings.TrimSpace(line[:equalsIndex])
+				keyWithCase := strings.TrimSpace(trimmedLine[:equalsIndex])
 				key := strings.ToLower(keyWithCase)
-				value := strings.TrimSpace(line[equalsIndex+1:])
+				value := strings.TrimSpace(trimmedLine[equalsIndex+1:])
 				presentValue, haskey := attributes[key]
 				if haskey {
 					switch key {
@@ -79,13 +80,13 @@ func readTunnelConfiguration(wgQuickConfig string, called string) (TunnelConfigu
 					attributes[key] = value
 				}
 
-			} else if trimmedLine != "[interface]" && trimmedLine != "[peer]" {
+			} else if trimmedLineLower != "[interface]" && trimmedLineLower != "[peer]" {
 				return conf, errors.New("invalidLine")
 			}
 		}
 
 		isLastLine := lineIndex == len(lines)-1
-		if isLastLine || trimmedLine == "[interface]" || trimmedLine == "[peer]" {
+		if isLastLine || trimmedLineLower == "[interface]" || trimmedLineLower == "[peer]" {
 			// Previous section has ended; process the attributes collected so far
 			if parserState == inInterfaceSection {
 				interfaceConf, err := collateInterfaceAttributes(attributes)
@@ -103,10 +104,10 @@ func readTunnelConfiguration(wgQuickConfig string, called string) (TunnelConfigu
 			}
 		}
 
-		if trimmedLine == "[interface]" {
+		if trimmedLineLower == "[interface]" {
 			parserState = inInterfaceSection
 			attributes = make(map[string]string)
-		} else if trimmedLine == "[peer]" {
+		} else if trimmedLineLower == "[peer]" {
 			parserState = inPeerSection
 			attributes = make(map[string]string)
 		}
