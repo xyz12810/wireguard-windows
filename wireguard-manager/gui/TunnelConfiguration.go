@@ -104,6 +104,20 @@ func readTunnelConfiguration(wgQuickConfig string, called string) (TunnelConfigu
 				} else {
 					attributes[key] = value
 				}
+				switch parserState {
+				case inPeerSection:
+					switch key {
+					case "publickey", "presharedkey", "allowedips", "endpoint", "persistentkeepalive":
+					default:
+						return conf, fmt.Errorf(peerHasUnrecognizedKey, key)
+					}
+				case inInterfaceSection:
+					switch key {
+					case "privatekey", "listenport", "address", "dns", "mtu":
+					default:
+						return conf, fmt.Errorf(interfaceHasUnrecognizedKey, key)
+					}
+				}
 
 			} else if trimmedLineLower != "[interface]" && trimmedLineLower != "[peer]" {
 				return conf, fmt.Errorf(invalidLine, line)
