@@ -3,6 +3,7 @@ package main
 import (
 	b64 "encoding/base64"
 	"errors"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -53,6 +54,30 @@ type Endpoint struct {
 	port   uint16
 }
 
+const (
+	invalidLine                       = "Invalid line: ‘%v’."
+	noInterface                       = "Configuration must have an ‘Interface’ section."
+	multipleInterfaces                = "Configuration must have only one ‘Interface’ section."
+	interfaceHasNoPrivateKey          = "Interface’s private key is required"
+	interfaceHasInvalidPrivateKey     = "Private key is invalid."
+	interfaceHasInvalidListenPort     = "Listen port ‘%v’ is invalid."
+	interfaceHasInvalidAddress        = "Address ‘%v’ is invalid."
+	interfaceHasInvalidDNS            = "DNS ‘%v’ is invalid."
+	interfaceHasInvalidMTU            = "MTU ‘%v’ is invalid."
+	interfaceHasUnrecognizedKey       = "Interface contains unrecognized key ‘%v’"
+	peerHasNoPublicKey                = "Peer’s public key is required"
+	peerHasInvalidPublicKey           = "Public key is invalid"
+	peerHasInvalidPreSharedKey        = "Preshared key is invalid"
+	peerHasInvalidAllowedIP           = "Allowed IP ‘%v’ is invalid"
+	peerHasInvalidEndpoint            = "Endpoint ‘%v’ is invalid"
+	peerHasInvalidPersistentKeepAlive = "Persistent keepalive value ‘%v’ is invalid"
+	peerHasUnrecognizedKey            = "Peer contains unrecognized key ‘%v’"
+	peerHasInvalidTransferBytes       = "Invalid line: ‘%v’."
+	peerHasInvalidLastHandshakeTime   = "Invalid line: ‘%v’."
+	multiplePeersWithSamePublicKey    = "Two or more peers cannot have the same public key"
+	multipleEntriesForKey             = "There should be only one entry per section for key ‘%v’"
+)
+
 func readTunnelConfiguration(wgQuickConfig string, called string) (TunnelConfiguration, error) {
 	lines := strings.Split(wgQuickConfig, "\n")
 	parserState := notInASection
@@ -74,14 +99,14 @@ func readTunnelConfiguration(wgQuickConfig string, called string) (TunnelConfigu
 					case "address", "allowedips", "dns":
 						attributes[key] = presentValue + ", " + value
 					default:
-						return conf, errors.New("multipleEntriesForKey")
+						return conf, fmt.Errorf(multipleEntriesForKey, key)
 					}
 				} else {
 					attributes[key] = value
 				}
 
 			} else if trimmedLineLower != "[interface]" && trimmedLineLower != "[peer]" {
-				return conf, errors.New("invalidLine")
+				return conf, fmt.Errorf(invalidLine, line)
 			}
 		}
 
@@ -130,11 +155,11 @@ func collateInterfaceAttributes(attributes map[string]string) (InterfaceConfigur
 	//conf.dns = make([]DNSServer, 0)
 	privateKeyString, c := attributes["privatekey"]
 	if !c {
-		return conf, errors.New("interfaceHasNoPrivateKey")
+		return conf, fmt.Errorf(interfaceHasNoPrivateKey)
 	}
 
 	if privateKey, err := b64.StdEncoding.DecodeString(privateKeyString); err != nil {
-		return conf, errors.New("interfaceHasInvalidPrivateKey")
+		return conf, fmt.Errorf(interfaceHasInvalidPrivateKey)
 	} else {
 		conf.privateKey = privateKey
 	}
@@ -143,7 +168,7 @@ func collateInterfaceAttributes(attributes map[string]string) (InterfaceConfigur
 		if listenPort, err := strconv.Atoi(listenPortString); err == nil {
 			conf.listenPort = uint16(listenPort)
 		} else {
-			return conf, errors.New("interfaceHasInvalidListenPort")
+			return conf, fmt.Errorf(interfaceHasInvalidListenPort, listenPortString)
 		}
 	}
 
@@ -155,7 +180,11 @@ func collateInterfaceAttributes(attributes map[string]string) (InterfaceConfigur
 
 	if dnsStrings, c := attributes["dns"]; c {
 		for _, dnsString := range strings.Split(dnsStrings, ",") {
-			dns := DNSServer(net.ParseIP(strings.TrimSpace(dnsString)))
+			ip := net.ParseIP(strings.TrimSpace(dnsString))
+			if ip == nil {
+				fmt.Errorf(interfaceHasInvalidDNS, dnsString)
+			}
+			dns := DNSServer(ip)
 			conf.dns = append(conf.dns, dns)
 		}
 	}
@@ -164,7 +193,7 @@ func collateInterfaceAttributes(attributes map[string]string) (InterfaceConfigur
 		if mtu, err := strconv.Atoi(mtuString); err == nil {
 			conf.mtu = uint16(mtu)
 		} else {
-			return conf, errors.New("interfaceHasInvalidMTU")
+			return conf, fmt.Errorf(interfaceHasInvalidMTU, mtuString)
 		}
 	}
 
@@ -176,12 +205,12 @@ func collatePeerAttributes(attributes map[string]string) (PeerConfiguration, err
 	//conf.allowedIPs = make([]IPAddressRange, 0)
 	publicKeyString, c := attributes["publickey"]
 	if !c {
-		return conf, errors.New("peerHasNoPublicKey")
+		return conf, fmt.Errorf(peerHasNoPublicKey)
 	}
 
 	publicKey, err := b64.StdEncoding.DecodeString(publicKeyString)
 	if err != nil || len(publicKey) != KeyLength {
-		return conf, errors.New("peerHasInvalidPublicKey")
+		return conf, fmt.Errorf(peerHasInvalidPublicKey)
 	}
 	conf.publicKey = publicKey
 
@@ -189,7 +218,7 @@ func collatePeerAttributes(attributes map[string]string) (PeerConfiguration, err
 		if preSharedKey, err := b64.StdEncoding.DecodeString(preSharedKeyString); err == nil && len(preSharedKey) == KeyLength {
 			conf.preSharedKey = preSharedKey
 		} else {
-			return conf, errors.New("peerHasInvalidPreSharedKey")
+			return conf, fmt.Errorf(peerHasInvalidPreSharedKey)
 		}
 	}
 
@@ -203,14 +232,14 @@ func collatePeerAttributes(attributes map[string]string) (PeerConfiguration, err
 		if endpoint, err := parseEndpoint(endpointString); err == nil {
 			conf.endpoint = endpoint
 		} else {
-			return conf, errors.New("peerHasInvalidEndpoint")
+			return conf, fmt.Errorf(peerHasInvalidEndpoint, endpointString)
 		}
 	}
 	if persistentKeepAliveString, c := attributes["persistentkeepalive"]; c {
 		if persistentKeepAlive, err := strconv.Atoi(persistentKeepAliveString); err == nil {
 			conf.persistentKeepAlive = uint16(persistentKeepAlive)
 		} else {
-			return conf, errors.New("peerHasInvalidPersistentKeepAlive")
+			return conf, fmt.Errorf(peerHasInvalidPersistentKeepAlive, persistentKeepAliveString)
 		}
 	}
 	return conf, nil
