@@ -13,7 +13,6 @@ const TestInput = `
 [Interface] 
 Address = 10.192.122.1/24 
 Address = 10.10.0.1/16 
-SaveConfig = true 
 PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk= 
 ListenPort = 51820  #comments don't matter
 
@@ -34,7 +33,7 @@ PresharedKey = TrMvSoP4jYQlY6RIzBgbssQqY3vxI2Pi+y71lOWWXX0=
 Endpoint = test.wireguard.com:18981 
 AllowedIPs = 10.10.10.230/32`
 
-func NoError(t *testing.T, err error) bool {
+func noError(t *testing.T, err error) bool {
 	if err == nil {
 		return true
 	}
@@ -43,7 +42,7 @@ func NoError(t *testing.T, err error) bool {
 	return false
 }
 
-func Equal(t *testing.T, expected, actual interface{}) bool {
+func equal(t *testing.T, expected, actual interface{}) bool {
 	if reflect.DeepEqual(expected, actual) {
 		return true
 	}
@@ -51,7 +50,7 @@ func Equal(t *testing.T, expected, actual interface{}) bool {
 	t.Errorf("Failed equals at %s:%d\nactual   %#v\nexpected %#v", fn, line, expected, actual)
 	return false
 }
-func Len(t *testing.T, actualO interface{}, expected int) bool {
+func lenTest(t *testing.T, actualO interface{}, expected int) bool {
 	actual := reflect.ValueOf(actualO).Len()
 	if reflect.DeepEqual(expected, actual) {
 		return true
@@ -60,7 +59,7 @@ func Len(t *testing.T, actualO interface{}, expected int) bool {
 	t.Errorf("Wrong length at %s:%d\nactual   %#v\nexpected %#v", fn, line, expected, actual)
 	return false
 }
-func Contains(t *testing.T, list, element interface{}) bool {
+func contains(t *testing.T, list, element interface{}) bool {
 	listValue := reflect.ValueOf(list)
 	for i := 0; i < listValue.Len(); i++ {
 		if reflect.DeepEqual(listValue.Index(i).Interface(), element) {
@@ -74,58 +73,58 @@ func Contains(t *testing.T, list, element interface{}) bool {
 
 func TestReadTunnelConfiguration(t *testing.T) {
 	conf, err := readTunnelConfiguration(TestInput, "test")
-	if NoError(t, err) {
+	if noError(t, err) {
 
-		Len(t, conf.wginterface.addresses, 2)
-		Contains(t, conf.wginterface.addresses, IPAddressRange{net.IPv4(10, 10, 0, 1), uint8(16)})
-		Contains(t, conf.wginterface.addresses, IPAddressRange{net.IPv4(10, 192, 122, 1), uint8(24)})
-		Equal(t, "yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=", b64.StdEncoding.EncodeToString(conf.wginterface.privateKey))
-		Equal(t, uint16(51820), conf.wginterface.listenPort)
+		lenTest(t, conf.wginterface.addresses, 2)
+		contains(t, conf.wginterface.addresses, IPAddressRange{net.IPv4(10, 10, 0, 1), uint8(16)})
+		contains(t, conf.wginterface.addresses, IPAddressRange{net.IPv4(10, 192, 122, 1), uint8(24)})
+		equal(t, "yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=", b64.StdEncoding.EncodeToString(conf.wginterface.privateKey))
+		equal(t, uint16(51820), conf.wginterface.listenPort)
 
-		Len(t, conf.peers, 3)
-		Len(t, conf.peers[0].allowedIPs, 2)
-		Equal(t, Endpoint{iphost: net.IPv4(192, 95, 5, 67), port: 1234}, conf.peers[0].endpoint)
-		Equal(t, "xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=", b64.StdEncoding.EncodeToString(conf.peers[0].publicKey))
+		lenTest(t, conf.peers, 3)
+		lenTest(t, conf.peers[0].allowedIPs, 2)
+		equal(t, Endpoint{iphost: net.IPv4(192, 95, 5, 67), port: 1234}, conf.peers[0].endpoint)
+		equal(t, "xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=", b64.StdEncoding.EncodeToString(conf.peers[0].publicKey))
 
-		Len(t, conf.peers[1].allowedIPs, 2)
-		Equal(t, Endpoint{iphost: net.IP{0x26, 0x07, 0x53, 0, 0, 0x60, 0x6, 0xb0, 0, 0, 0, 0, 0xc0, 0x5f, 0x5, 0x43}, port: 2468}, conf.peers[1].endpoint)
-		Equal(t, "TrMvSoP4jYQlY6RIzBgbssQqY3vxI2Pi+y71lOWWXX0=", b64.StdEncoding.EncodeToString(conf.peers[1].publicKey))
-		Equal(t, uint16(100), conf.peers[1].persistentKeepAlive)
+		lenTest(t, conf.peers[1].allowedIPs, 2)
+		equal(t, Endpoint{iphost: net.IP{0x26, 0x07, 0x53, 0, 0, 0x60, 0x6, 0xb0, 0, 0, 0, 0, 0xc0, 0x5f, 0x5, 0x43}, port: 2468}, conf.peers[1].endpoint)
+		equal(t, "TrMvSoP4jYQlY6RIzBgbssQqY3vxI2Pi+y71lOWWXX0=", b64.StdEncoding.EncodeToString(conf.peers[1].publicKey))
+		equal(t, uint16(100), conf.peers[1].persistentKeepAlive)
 
-		Len(t, conf.peers[2].allowedIPs, 1)
-		Equal(t, Endpoint{host: "test.wireguard.com", port: 18981}, conf.peers[2].endpoint)
-		Equal(t, "gN65BkIKy1eCE9pP1wdc8ROUtkHLF2PfAqYdyYBz6EA=", b64.StdEncoding.EncodeToString(conf.peers[2].publicKey))
-		Equal(t, "TrMvSoP4jYQlY6RIzBgbssQqY3vxI2Pi+y71lOWWXX0=", b64.StdEncoding.EncodeToString(conf.peers[2].preSharedKey))
+		lenTest(t, conf.peers[2].allowedIPs, 1)
+		equal(t, Endpoint{host: "test.wireguard.com", port: 18981}, conf.peers[2].endpoint)
+		equal(t, "gN65BkIKy1eCE9pP1wdc8ROUtkHLF2PfAqYdyYBz6EA=", b64.StdEncoding.EncodeToString(conf.peers[2].publicKey))
+		equal(t, "TrMvSoP4jYQlY6RIzBgbssQqY3vxI2Pi+y71lOWWXX0=", b64.StdEncoding.EncodeToString(conf.peers[2].preSharedKey))
 	}
 }
 
 func TestParseIPAddressRange(t *testing.T) {
 	ip := parseIPAddressRange("10.10.10.230/32")
 
-	Equal(t, uint8(32), ip.networkPrefixLength)
-	Equal(t, net.IPv4(10, 10, 10, 230), ip.address)
-	Equal(t, ip, IPAddressRange{net.IPv4(10, 10, 10, 230), uint8(32)})
+	equal(t, uint8(32), ip.networkPrefixLength)
+	equal(t, net.IPv4(10, 10, 10, 230), ip.address)
+	equal(t, ip, IPAddressRange{net.IPv4(10, 10, 10, 230), uint8(32)})
 }
 
 func TestParseEndpoint(t *testing.T) {
 	e, err := parseEndpoint("192.168.42.0:51880")
-	if NoError(t, err) {
-		Equal(t, net.IPv4(192, 168, 42, 0), e.iphost)
-		Equal(t, "", e.host)
-		Equal(t, uint16(51880), e.port)
+	if noError(t, err) {
+		equal(t, net.IPv4(192, 168, 42, 0), e.iphost)
+		equal(t, "", e.host)
+		equal(t, uint16(51880), e.port)
 	}
 	e, err = parseEndpoint("test.wireguard.com:18981")
-	if NoError(t, err) {
-		Equal(t, net.IP(nil), e.iphost)
-		Equal(t, "test.wireguard.com", e.host)
-		Equal(t, uint16(18981), e.port)
+	if noError(t, err) {
+		equal(t, net.IP(nil), e.iphost)
+		equal(t, "test.wireguard.com", e.host)
+		equal(t, uint16(18981), e.port)
 	}
 
 	e, err = parseEndpoint("[2607:5300:60:6b0::c05f:543]:2468")
-	if NoError(t, err) {
-		Equal(t, net.IP{0x26, 0x07, 0x53, 0, 0, 0x60, 0x6, 0xb0, 0, 0, 0, 0, 0xc0, 0x5f, 0x5, 0x43}, e.iphost)
-		Equal(t, "", e.host)
-		Equal(t, uint16(2468), e.port)
+	if noError(t, err) {
+		equal(t, net.IP{0x26, 0x07, 0x53, 0, 0, 0x60, 0x6, 0xb0, 0, 0, 0, 0, 0xc0, 0x5f, 0x5, 0x43}, e.iphost)
+		equal(t, "", e.host)
+		equal(t, uint16(2468), e.port)
 	}
 
 	_, err = parseEndpoint("[::::::invalid:18981")

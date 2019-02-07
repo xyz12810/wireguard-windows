@@ -14,6 +14,8 @@ type ParserState int
 
 const KeyLength = 32
 
+const zeros [KeyLength]byte
+
 const (
 	inInterfaceSection ParserState = iota
 	inPeerSection
@@ -77,6 +79,61 @@ const (
 	multiplePeersWithSamePublicKey    = "Two or more peers cannot have the same public key"
 	multipleEntriesForKey             = "There should be only one entry per section for key ‘%v’"
 )
+
+func (e Endpoint) String() string {
+	return
+}
+
+func (conf TunnelConfiguration) asWgQuickConfig() string {
+	var output strings.Builder
+	output.WriteString("[Interface]\n")
+	output.WriteString("PrivateKey = " + b64.StdEncoding.EncodeToString(conf.wginterface.privateKey) + "\n")
+	if listenPort := conf.wginterface.listenPort; listenPort > 0 {
+		output.WriteString("ListenPort = " + listenPort + "\n")
+	}
+
+	if len(conf.wginterface.addresses) > 0 {
+
+		for i, address := range conf.wginterface.addresses {
+			if i == 0 {
+				output.WriteString("Address = " + address)
+			} else {
+				output.WriteString(", ")
+				output.WriteString(address)
+			}
+		}
+		output.WriteString("\n")
+	}
+	// if !conf.wginterface.addresses.isEmpty {
+	//     addressString := conf.wginterface.addresses.map { $0.stringRepresentation }.joined(separator: ", ")
+	//     output.WriteString("Address = " + addressString + "\n")
+	// }
+	// if !conf.wginterface.dns.isEmpty {
+	//     dnsString := conf.wginterface.dns.map { $0.stringRepresentation }.joined(separator: ", ")
+	//     output.WriteString("DNS = " + dnsString + "\n")
+	// }
+	if mtu := conf.wginterface.mtu; mtu > 0 {
+		output.WriteString("MTU = " + mtu + "\n")
+	}
+
+	for _, peer := range conf.peers {
+		output.WriteString("\n[Peer]\n")
+		output.WriteString("PublicKey = " + b64.StdEncoding.EncodeToString(peer.publicKey) + "\n")
+		if preSharedKey := peer.preSharedKey; len(preSharedKey) > 0 {
+			output.WriteString("PresharedKey = " + b64.StdEncoding.EncodeToString(preSharedKey) + "\n")
+		}
+		// if !peer.allowedIPs.isEmpty {
+		//     allowedIPsString := peer.allowedIPs.map { $0.stringRepresentation }.joined(separator: ", ")
+		//     output.WriteString("AllowedIPs = " + allowedIPsString + "\n")
+		// }
+		if endpoint := peer.endpoint; endpoint != Endpoint() {
+			output.WriteString("Endpoint = " + endpoint + "\n")
+		}
+		if persistentKeepAlive := peer.persistentKeepAlive; persistentKeepAlive > 0 {
+			output.WriteString("PersistentKeepalive = " + persistentKeepAlive + "\n")
+		}
+	}
+}
 
 func readTunnelConfiguration(wgQuickConfig string, called string) (TunnelConfiguration, error) {
 	lines := strings.Split(wgQuickConfig, "\n")
