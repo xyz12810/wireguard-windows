@@ -372,8 +372,15 @@ func parseEndpoint(s string) (Endpoint, error) {
 	} else {
 		endpoint.port = uint16(port)
 	}
-
-	if host := net.ParseIP(strings.Trim(s[:endOfHostIndex], "[]")); host == nil {
+	if s[0] == '[' { //assume ipv6
+		if s[endOfHostIndex-1] != ']' {
+			return endpoint, errors.New("Unable to find matching brace of IPv6 endpoint")
+		}
+		if endpoint.iphost = net.ParseIP(s[1 : endOfHostIndex-1]); endpoint.iphost == nil {
+			return endpoint, errors.New("Invalid IPv6")
+		}
+	}
+	if host := net.ParseIP(s[:endOfHostIndex]); host == nil {
 		endpoint.host = s[:endOfHostIndex]
 	} else {
 		endpoint.iphost = host
