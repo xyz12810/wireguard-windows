@@ -379,12 +379,14 @@ func parseEndpoint(s string) (Endpoint, error) {
 		if endpoint.iphost = net.ParseIP(s[1 : endOfHostIndex-1]); endpoint.iphost == nil {
 			return endpoint, errors.New("Invalid IPv6")
 		}
-	}
-	if host := net.ParseIP(s[:endOfHostIndex]); host == nil {
-		endpoint.host = s[:endOfHostIndex]
 	} else {
-		endpoint.iphost = host
+		if host := net.ParseIP(s[:endOfHostIndex]); host == nil {
+			endpoint.host = s[:endOfHostIndex]
+		} else {
+			endpoint.iphost = host
+		}
 	}
+
 	return endpoint, nil
 
 }

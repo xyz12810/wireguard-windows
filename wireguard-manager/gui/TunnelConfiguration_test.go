@@ -47,7 +47,7 @@ func equal(t *testing.T, expected, actual interface{}) bool {
 		return true
 	}
 	_, fn, line, _ := runtime.Caller(1)
-	t.Errorf("Failed equals at %s:%d\nactual   %#v\nexpected %#v", fn, line, expected, actual)
+	t.Errorf("Failed equals at %s:%d\nactual   %#v\nexpected %#v", fn, line, actual, expected)
 	return false
 }
 func lenTest(t *testing.T, actualO interface{}, expected int) bool {
@@ -56,7 +56,7 @@ func lenTest(t *testing.T, actualO interface{}, expected int) bool {
 		return true
 	}
 	_, fn, line, _ := runtime.Caller(1)
-	t.Errorf("Wrong length at %s:%d\nactual   %#v\nexpected %#v", fn, line, expected, actual)
+	t.Errorf("Wrong length at %s:%d\nactual   %#v\nexpected %#v", fn, line, actual, expected)
 	return false
 }
 func contains(t *testing.T, list, element interface{}) bool {
