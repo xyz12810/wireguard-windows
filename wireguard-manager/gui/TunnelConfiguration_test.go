@@ -83,18 +83,18 @@ func TestReadTunnelConfiguration(t *testing.T) {
 
 		lenTest(t, conf.peers, 3)
 		lenTest(t, conf.peers[0].allowedIPs, 2)
-		equal(t, Endpoint{iphost: net.IPv4(192, 95, 5, 67), port: 1234}, conf.peers[0].endpoint)
+		equal(t, Endpoint{iphost: net.IPv4(192, 95, 5, 67), port: 1234}, *conf.peers[0].endpoint)
 		equal(t, "xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=", b64.StdEncoding.EncodeToString(conf.peers[0].publicKey))
 
 		lenTest(t, conf.peers[1].allowedIPs, 2)
-		equal(t, Endpoint{iphost: net.IP{0x26, 0x07, 0x53, 0, 0, 0x60, 0x6, 0xb0, 0, 0, 0, 0, 0xc0, 0x5f, 0x5, 0x43}, port: 2468}, conf.peers[1].endpoint)
+		equal(t, Endpoint{iphost: net.IP{0x26, 0x07, 0x53, 0, 0, 0x60, 0x6, 0xb0, 0, 0, 0, 0, 0xc0, 0x5f, 0x5, 0x43}, port: 2468}, *conf.peers[1].endpoint)
 		equal(t, "TrMvSoP4jYQlY6RIzBgbssQqY3vxI2Pi+y71lOWWXX0=", b64.StdEncoding.EncodeToString(conf.peers[1].publicKey))
 		equal(t, uint16(100), conf.peers[1].persistentKeepAlive)
 
 		lenTest(t, conf.peers[2].allowedIPs, 1)
-		equal(t, Endpoint{host: "test.wireguard.com", port: 18981}, conf.peers[2].endpoint)
+		equal(t, Endpoint{host: "test.wireguard.com", port: 18981}, *conf.peers[2].endpoint)
 		equal(t, "gN65BkIKy1eCE9pP1wdc8ROUtkHLF2PfAqYdyYBz6EA=", b64.StdEncoding.EncodeToString(conf.peers[2].publicKey))
-		equal(t, "TrMvSoP4jYQlY6RIzBgbssQqY3vxI2Pi+y71lOWWXX0=", b64.StdEncoding.EncodeToString(conf.peers[2].preSharedKey))
+		equal(t, "TrMvSoP4jYQlY6RIzBgbssQqY3vxI2Pi+y71lOWWXX0=", b64.StdEncoding.EncodeToString(*conf.peers[2].preSharedKey))
 	}
 }
 

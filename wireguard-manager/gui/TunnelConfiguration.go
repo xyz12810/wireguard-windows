@@ -14,8 +14,6 @@ type ParserState int
 
 const KeyLength = 32
 
-const zeros [KeyLength]byte
-
 const (
 	inInterfaceSection ParserState = iota
 	inPeerSection
@@ -29,9 +27,9 @@ type TunnelConfiguration struct {
 }
 type PeerConfiguration struct {
 	publicKey           []byte
-	preSharedKey        []byte
+	preSharedKey        *[]byte
 	allowedIPs          []IPAddressRange
-	endpoint            Endpoint
+	endpoint            *Endpoint
 	persistentKeepAlive uint16
 	rxBytes             uint64
 	txBytes             uint64
@@ -80,59 +78,88 @@ const (
 	multipleEntriesForKey             = "There should be only one entry per section for key ‘%v’"
 )
 
+func (r IPAddressRange) String() string {
+	return fmt.Sprintf("%v/%v", r.address, r.networkPrefixLength)
+}
+
+func (d DNSServer) String() string {
+	return net.IP(d).String()
+}
+
 func (e Endpoint) String() string {
-	return
+	if e.host != "" {
+		return fmt.Sprintf("%v:%v", e.host, e.port)
+	}
+	if p4 := e.iphost.To4(); len(p4) == net.IPv4len {
+		return fmt.Sprintf("%v:%v", e.host, e.port)
+	}
+	return fmt.Sprintf("[%v]:%v", e.host, e.port)
 }
 
 func (conf TunnelConfiguration) asWgQuickConfig() string {
 	var output strings.Builder
 	output.WriteString("[Interface]\n")
 	output.WriteString("PrivateKey = " + b64.StdEncoding.EncodeToString(conf.wginterface.privateKey) + "\n")
-	if listenPort := conf.wginterface.listenPort; listenPort > 0 {
-		output.WriteString("ListenPort = " + listenPort + "\n")
+	if conf.wginterface.listenPort > 0 {
+		output.WriteString(fmt.Sprintf("ListenPort = %v\n", conf.wginterface.listenPort))
 	}
 
 	if len(conf.wginterface.addresses) > 0 {
 
 		for i, address := range conf.wginterface.addresses {
 			if i == 0 {
-				output.WriteString("Address = " + address)
+				output.WriteString("Address = " + address.String())
 			} else {
 				output.WriteString(", ")
-				output.WriteString(address)
+				output.WriteString(address.String())
 			}
 		}
 		output.WriteString("\n")
 	}
-	// if !conf.wginterface.addresses.isEmpty {
-	//     addressString := conf.wginterface.addresses.map { $0.stringRepresentation }.joined(separator: ", ")
-	//     output.WriteString("Address = " + addressString + "\n")
-	// }
-	// if !conf.wginterface.dns.isEmpty {
-	//     dnsString := conf.wginterface.dns.map { $0.stringRepresentation }.joined(separator: ", ")
-	//     output.WriteString("DNS = " + dnsString + "\n")
-	// }
-	if mtu := conf.wginterface.mtu; mtu > 0 {
-		output.WriteString("MTU = " + mtu + "\n")
+
+	if len(conf.wginterface.dns) > 0 {
+
+		for i, dns := range conf.wginterface.dns {
+			if i == 0 {
+				output.WriteString("DNS = " + dns.String())
+			} else {
+				output.WriteString(", ")
+				output.WriteString(dns.String())
+			}
+		}
+		output.WriteString("\n")
+	}
+	if conf.wginterface.mtu > 0 {
+		output.WriteString(fmt.Sprintf("MTU = %v\n", conf.wginterface.mtu))
 	}
 
 	for _, peer := range conf.peers {
 		output.WriteString("\n[Peer]\n")
 		output.WriteString("PublicKey = " + b64.StdEncoding.EncodeToString(peer.publicKey) + "\n")
-		if preSharedKey := peer.preSharedKey; len(preSharedKey) > 0 {
-			output.WriteString("PresharedKey = " + b64.StdEncoding.EncodeToString(preSharedKey) + "\n")
+		if peer.preSharedKey != nil {
+			output.WriteString("PresharedKey = " + b64.StdEncoding.EncodeToString(*peer.preSharedKey) + "\n")
 		}
-		// if !peer.allowedIPs.isEmpty {
-		//     allowedIPsString := peer.allowedIPs.map { $0.stringRepresentation }.joined(separator: ", ")
-		//     output.WriteString("AllowedIPs = " + allowedIPsString + "\n")
-		// }
-		if endpoint := peer.endpoint; endpoint != Endpoint() {
-			output.WriteString("Endpoint = " + endpoint + "\n")
+
+		if len(peer.allowedIPs) > 0 {
+
+			for i, allowedIP := range peer.allowedIPs {
+				if i == 0 {
+					output.WriteString("AllowedIPs = " + allowedIP.String())
+				} else {
+					output.WriteString(", ")
+					output.WriteString(allowedIP.String())
+				}
+			}
+			output.WriteString("\n")
 		}
-		if persistentKeepAlive := peer.persistentKeepAlive; persistentKeepAlive > 0 {
-			output.WriteString("PersistentKeepalive = " + persistentKeepAlive + "\n")
+		if peer.endpoint != nil {
+			output.WriteString("Endpoint = " + peer.endpoint.String() + "\n")
+		}
+		if peer.persistentKeepAlive > 0 {
+			output.WriteString(fmt.Sprintf("PersistentKeepalive = %v\n", peer.persistentKeepAlive))
 		}
 	}
+	return output.String()
 }
 
 func readTunnelConfiguration(wgQuickConfig string, called string) (TunnelConfiguration, error) {
@@ -229,7 +256,7 @@ func collateInterfaceAttributes(attributes map[string]string) (InterfaceConfigur
 		return conf, fmt.Errorf(interfaceHasNoPrivateKey)
 	}
 
-	if privateKey, err := b64.StdEncoding.DecodeString(privateKeyString); err != nil {
+	if privateKey, err := b64.StdEncoding.DecodeString(privateKeyString); err != nil || len(privateKey) != KeyLength {
 		return conf, fmt.Errorf(interfaceHasInvalidPrivateKey)
 	} else {
 		conf.privateKey = privateKey
@@ -287,7 +314,7 @@ func collatePeerAttributes(attributes map[string]string) (PeerConfiguration, err
 
 	if preSharedKeyString, c := attributes["presharedkey"]; c {
 		if preSharedKey, err := b64.StdEncoding.DecodeString(preSharedKeyString); err == nil && len(preSharedKey) == KeyLength {
-			conf.preSharedKey = preSharedKey
+			conf.preSharedKey = &preSharedKey
 		} else {
 			return conf, fmt.Errorf(peerHasInvalidPreSharedKey)
 		}
@@ -301,7 +328,7 @@ func collatePeerAttributes(attributes map[string]string) (PeerConfiguration, err
 
 	if endpointString, c := attributes["endpoint"]; c {
 		if endpoint, err := parseEndpoint(endpointString); err == nil {
-			conf.endpoint = endpoint
+			conf.endpoint = &endpoint
 		} else {
 			return conf, fmt.Errorf(peerHasInvalidEndpoint, endpointString)
 		}
