@@ -21,37 +21,37 @@ const (
 )
 
 type TunnelConfiguration struct {
-	name        string
-	wginterface InterfaceConfiguration
-	peers       []PeerConfiguration
+	Name        string
+	WGInterface InterfaceConfiguration
+	Peers       []PeerConfiguration
 }
 type PeerConfiguration struct {
-	publicKey           []byte
-	preSharedKey        *[]byte
-	allowedIPs          []IPAddressRange
-	endpoint            *Endpoint
-	persistentKeepAlive uint16
+	PublicKey           []byte
+	PreSharedKey        *[]byte
+	AllowedIPs          []IPAddressRange
+	Endpoint            *Endpoint
+	PersistentKeepAlive uint16
 	rxBytes             uint64
 	txBytes             uint64
 	lastHandshakeTime   time.Time
 }
 type InterfaceConfiguration struct {
-	privateKey []byte
-	addresses  []IPAddressRange
-	listenPort uint16
-	mtu        uint16
-	dns        []DNSServer
+	PrivateKey []byte
+	Addresses  []IPAddressRange
+	ListenPort uint16
+	Mtu        uint16
+	Dns        []DNSServer
 }
 type IPAddressRange struct {
-	address             net.IP
-	networkPrefixLength uint8
+	Address             net.IP
+	NetworkPrefixLength uint8
 }
 
 type DNSServer net.IP
 type Endpoint struct {
-	host   string
-	iphost net.IP
-	port   uint16
+	Host   string
+	Iphost net.IP
+	Port   uint16
 }
 
 const (
@@ -79,7 +79,7 @@ const (
 )
 
 func (r IPAddressRange) String() string {
-	return fmt.Sprintf("%v/%v", r.address, r.networkPrefixLength)
+	return fmt.Sprintf("%v/%v", r.Address, r.NetworkPrefixLength)
 }
 
 func (d DNSServer) String() string {
@@ -87,26 +87,26 @@ func (d DNSServer) String() string {
 }
 
 func (e Endpoint) String() string {
-	if e.host != "" {
-		return fmt.Sprintf("%v:%v", e.host, e.port)
+	if e.Host != "" {
+		return fmt.Sprintf("%v:%v", e.Host, e.Port)
 	}
-	if p4 := e.iphost.To4(); len(p4) == net.IPv4len {
-		return fmt.Sprintf("%v:%v", e.host, e.port)
+	if p4 := e.Iphost.To4(); len(p4) == net.IPv4len {
+		return fmt.Sprintf("%v:%v", e.Iphost, e.Port)
 	}
-	return fmt.Sprintf("[%v]:%v", e.host, e.port)
+	return fmt.Sprintf("[%v]:%v", e.Iphost, e.Port)
 }
 
 func (conf TunnelConfiguration) asWgQuickConfig() string {
 	var output strings.Builder
 	output.WriteString("[Interface]\n")
-	output.WriteString("PrivateKey = " + b64.StdEncoding.EncodeToString(conf.wginterface.privateKey) + "\n")
-	if conf.wginterface.listenPort > 0 {
-		output.WriteString(fmt.Sprintf("ListenPort = %v\n", conf.wginterface.listenPort))
+	output.WriteString("PrivateKey = " + b64.StdEncoding.EncodeToString(conf.WGInterface.PrivateKey) + "\n")
+	if conf.WGInterface.ListenPort > 0 {
+		output.WriteString(fmt.Sprintf("ListenPort = %v\n", conf.WGInterface.ListenPort))
 	}
 
-	if len(conf.wginterface.addresses) > 0 {
+	if len(conf.WGInterface.Addresses) > 0 {
 
-		for i, address := range conf.wginterface.addresses {
+		for i, address := range conf.WGInterface.Addresses {
 			if i == 0 {
 				output.WriteString("Address = " + address.String())
 			} else {
@@ -117,9 +117,9 @@ func (conf TunnelConfiguration) asWgQuickConfig() string {
 		output.WriteString("\n")
 	}
 
-	if len(conf.wginterface.dns) > 0 {
+	if len(conf.WGInterface.Dns) > 0 {
 
-		for i, dns := range conf.wginterface.dns {
+		for i, dns := range conf.WGInterface.Dns {
 			if i == 0 {
 				output.WriteString("DNS = " + dns.String())
 			} else {
@@ -129,20 +129,20 @@ func (conf TunnelConfiguration) asWgQuickConfig() string {
 		}
 		output.WriteString("\n")
 	}
-	if conf.wginterface.mtu > 0 {
-		output.WriteString(fmt.Sprintf("MTU = %v\n", conf.wginterface.mtu))
+	if conf.WGInterface.Mtu > 0 {
+		output.WriteString(fmt.Sprintf("MTU = %v\n", conf.WGInterface.Mtu))
 	}
 
-	for _, peer := range conf.peers {
+	for _, peer := range conf.Peers {
 		output.WriteString("\n[Peer]\n")
-		output.WriteString("PublicKey = " + b64.StdEncoding.EncodeToString(peer.publicKey) + "\n")
-		if peer.preSharedKey != nil {
-			output.WriteString("PresharedKey = " + b64.StdEncoding.EncodeToString(*peer.preSharedKey) + "\n")
+		output.WriteString("PublicKey = " + b64.StdEncoding.EncodeToString(peer.PublicKey) + "\n")
+		if peer.PreSharedKey != nil {
+			output.WriteString("PresharedKey = " + b64.StdEncoding.EncodeToString(*peer.PreSharedKey) + "\n")
 		}
 
-		if len(peer.allowedIPs) > 0 {
+		if len(peer.AllowedIPs) > 0 {
 
-			for i, allowedIP := range peer.allowedIPs {
+			for i, allowedIP := range peer.AllowedIPs {
 				if i == 0 {
 					output.WriteString("AllowedIPs = " + allowedIP.String())
 				} else {
@@ -152,11 +152,11 @@ func (conf TunnelConfiguration) asWgQuickConfig() string {
 			}
 			output.WriteString("\n")
 		}
-		if peer.endpoint != nil {
-			output.WriteString("Endpoint = " + peer.endpoint.String() + "\n")
+		if peer.Endpoint != nil {
+			output.WriteString("Endpoint = " + peer.Endpoint.String() + "\n")
 		}
-		if peer.persistentKeepAlive > 0 {
-			output.WriteString(fmt.Sprintf("PersistentKeepalive = %v\n", peer.persistentKeepAlive))
+		if peer.PersistentKeepAlive > 0 {
+			output.WriteString(fmt.Sprintf("PersistentKeepalive = %v\n", peer.PersistentKeepAlive))
 		}
 	}
 	return output.String()
@@ -165,7 +165,7 @@ func (conf TunnelConfiguration) asWgQuickConfig() string {
 func readTunnelConfiguration(wgQuickConfig string, called string) (TunnelConfiguration, error) {
 	lines := strings.Split(wgQuickConfig, "\n")
 	parserState := notInASection
-	conf := TunnelConfiguration{}
+	conf := TunnelConfiguration{Name: called}
 	attributes := make(map[string]string)
 	peers := make([]PeerConfiguration, 0)
 	for lineIndex, line := range lines {
@@ -216,7 +216,7 @@ func readTunnelConfiguration(wgQuickConfig string, called string) (TunnelConfigu
 				if err != nil {
 					return conf, err
 				}
-				conf.wginterface = interfaceConf
+				conf.WGInterface = interfaceConf
 				//todo: check for multiple
 			} else if parserState == inPeerSection {
 				peer, err := collatePeerAttributes(attributes)
@@ -236,7 +236,7 @@ func readTunnelConfiguration(wgQuickConfig string, called string) (TunnelConfigu
 		}
 
 	}
-	conf.peers = peers
+	conf.Peers = peers
 	return conf, nil
 
 }
@@ -259,12 +259,12 @@ func collateInterfaceAttributes(attributes map[string]string) (InterfaceConfigur
 	if privateKey, err := b64.StdEncoding.DecodeString(privateKeyString); err != nil || len(privateKey) != KeyLength {
 		return conf, fmt.Errorf(interfaceHasInvalidPrivateKey)
 	} else {
-		conf.privateKey = privateKey
+		conf.PrivateKey = privateKey
 	}
 
 	if listenPortString, c := attributes["listenport"]; c {
 		if listenPort, err := strconv.Atoi(listenPortString); err == nil {
-			conf.listenPort = uint16(listenPort)
+			conf.ListenPort = uint16(listenPort)
 		} else {
 			return conf, fmt.Errorf(interfaceHasInvalidListenPort, listenPortString)
 		}
@@ -272,7 +272,7 @@ func collateInterfaceAttributes(attributes map[string]string) (InterfaceConfigur
 
 	if addressesString, c := attributes["address"]; c {
 		for _, addressString := range strings.Split(addressesString, ",") {
-			conf.addresses = append(conf.addresses, parseIPAddressRange(addressString))
+			conf.Addresses = append(conf.Addresses, parseIPAddressRange(addressString))
 		}
 	}
 
@@ -283,13 +283,13 @@ func collateInterfaceAttributes(attributes map[string]string) (InterfaceConfigur
 				fmt.Errorf(interfaceHasInvalidDNS, dnsString)
 			}
 			dns := DNSServer(ip)
-			conf.dns = append(conf.dns, dns)
+			conf.Dns = append(conf.Dns, dns)
 		}
 	}
 
 	if mtuString, c := attributes["mtu"]; c {
 		if mtu, err := strconv.Atoi(mtuString); err == nil {
-			conf.mtu = uint16(mtu)
+			conf.Mtu = uint16(mtu)
 		} else {
 			return conf, fmt.Errorf(interfaceHasInvalidMTU, mtuString)
 		}
@@ -310,11 +310,11 @@ func collatePeerAttributes(attributes map[string]string) (PeerConfiguration, err
 	if err != nil || len(publicKey) != KeyLength {
 		return conf, fmt.Errorf(peerHasInvalidPublicKey)
 	}
-	conf.publicKey = publicKey
+	conf.PublicKey = publicKey
 
 	if preSharedKeyString, c := attributes["presharedkey"]; c {
 		if preSharedKey, err := b64.StdEncoding.DecodeString(preSharedKeyString); err == nil && len(preSharedKey) == KeyLength {
-			conf.preSharedKey = &preSharedKey
+			conf.PreSharedKey = &preSharedKey
 		} else {
 			return conf, fmt.Errorf(peerHasInvalidPreSharedKey)
 		}
@@ -322,20 +322,20 @@ func collatePeerAttributes(attributes map[string]string) (PeerConfiguration, err
 
 	if allowedIPsString, c := attributes["allowedips"]; c {
 		for _, allowedIPString := range strings.Split(allowedIPsString, ",") {
-			conf.allowedIPs = append(conf.allowedIPs, parseIPAddressRange(allowedIPString))
+			conf.AllowedIPs = append(conf.AllowedIPs, parseIPAddressRange(allowedIPString))
 		}
 	}
 
 	if endpointString, c := attributes["endpoint"]; c {
 		if endpoint, err := parseEndpoint(endpointString); err == nil {
-			conf.endpoint = &endpoint
+			conf.Endpoint = &endpoint
 		} else {
 			return conf, fmt.Errorf(peerHasInvalidEndpoint, endpointString)
 		}
 	}
 	if persistentKeepAliveString, c := attributes["persistentkeepalive"]; c {
 		if persistentKeepAlive, err := strconv.Atoi(persistentKeepAliveString); err == nil {
-			conf.persistentKeepAlive = uint16(persistentKeepAlive)
+			conf.PersistentKeepAlive = uint16(persistentKeepAlive)
 		} else {
 			return conf, fmt.Errorf(peerHasInvalidPersistentKeepAlive, persistentKeepAliveString)
 		}
@@ -346,16 +346,16 @@ func collatePeerAttributes(attributes map[string]string) (PeerConfiguration, err
 func parseIPAddressRange(addressString string) IPAddressRange {
 	addressrange := IPAddressRange{}
 	addressSplit := strings.Split(strings.TrimSpace(addressString), "/")
-	addressrange.address = net.ParseIP(addressSplit[0]) //test for nil?
+	addressrange.Address = net.ParseIP(addressSplit[0]) //test for nil?
 
 	maxNetworkPrefixLength := 128
-	if addressrange.address.To4() != nil {
+	if addressrange.Address.To4() != nil {
 		maxNetworkPrefixLength = 32
 	}
-	addressrange.networkPrefixLength = uint8(maxNetworkPrefixLength)
+	addressrange.NetworkPrefixLength = uint8(maxNetworkPrefixLength)
 	if len(addressSplit) == 2 {
 		if networkPrefixLength, err := strconv.Atoi(addressSplit[1]); err == nil {
-			addressrange.networkPrefixLength = uint8(min(networkPrefixLength, maxNetworkPrefixLength))
+			addressrange.NetworkPrefixLength = uint8(min(networkPrefixLength, maxNetworkPrefixLength))
 		}
 	}
 	return addressrange
@@ -370,20 +370,20 @@ func parseEndpoint(s string) (Endpoint, error) {
 	if port, err := strconv.Atoi(s[endOfHostIndex+1:]); err != nil {
 		return endpoint, errors.New("Problem parsing port")
 	} else {
-		endpoint.port = uint16(port)
+		endpoint.Port = uint16(port)
 	}
 	if s[0] == '[' { //assume ipv6
 		if s[endOfHostIndex-1] != ']' {
 			return endpoint, errors.New("Unable to find matching brace of IPv6 endpoint")
 		}
-		if endpoint.iphost = net.ParseIP(s[1 : endOfHostIndex-1]); endpoint.iphost == nil {
+		if endpoint.Iphost = net.ParseIP(s[1 : endOfHostIndex-1]); endpoint.Iphost == nil {
 			return endpoint, errors.New("Invalid IPv6")
 		}
 	} else {
 		if host := net.ParseIP(s[:endOfHostIndex]); host == nil {
-			endpoint.host = s[:endOfHostIndex]
+			endpoint.Host = s[:endOfHostIndex]
 		} else {
-			endpoint.iphost = host
+			endpoint.Iphost = host
 		}
 	}
 
