@@ -133,7 +133,7 @@ func (mw *MyMainWindow) leftSectionMenu() []MenuItem {
 			OnTriggered: func() {
 				if cmd, err := RunRequestDialog(mw); err != nil {
 					log.Print(err)
-				} else if i := mw.lb.CurrentIndex(); cmd == walk.DlgCmdOK && i > 0 {
+				} else if i := mw.lb.CurrentIndex(); cmd == walk.DlgCmdOK && i >= 0 {
 					mw.model.items = append(mw.model.items[:i], mw.model.items[i+1:]...)
 					mw.model.PublishItemsReset()
 				}
@@ -386,7 +386,14 @@ func updateDetails(mw *MyMainWindow) {
 func (mw *MyMainWindow) currentIndexChanged() {
 
 	i := mw.lb.CurrentIndex()
-	mw.model.Current = mw.model.items[i]
+	var current TunnelConfiguration
+	if i < 0 || i >= len(mw.model.items) {
+		current = TunnelConfiguration{}
+	} else {
+		current = mw.model.items[i]
+	}
+
+	mw.model.Current = current
 	mw.db.Reset()
 	for _, p := range mw.model.Current.Peers {
 		getPeer(p).Create(NewBuilder(mw.peerSection))
