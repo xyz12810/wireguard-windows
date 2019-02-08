@@ -1,16 +1,19 @@
 package main
 
 import (
+	"archive/zip"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"strings"
 
+	"encoding/base64"
 	b64 "encoding/base64"
 	"path/filepath"
 
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
+	"golang.org/x/crypto/curve25519"
 )
 
 type MyMainWindow struct {
@@ -46,7 +49,7 @@ func main() {
 					ListBox{
 						AssignTo:              &mw.lb,
 						Model:                 mw.model,
-						OnCurrentIndexChanged: mw.lb_CurrentIndexChanged,
+						OnCurrentIndexChanged: mw.currentIndexChanged,
 					},
 					Composite{
 						Layout: HBox{MarginsZero: true, SpacingZero: true},
@@ -61,7 +64,7 @@ func main() {
 			},
 			Composite{
 				StretchFactor: 2,
-				Layout:        VBox{},
+				Layout:        VBox{MarginsZero: true},
 				Children:      mw.rightSection(),
 			},
 			Composite{
@@ -92,7 +95,19 @@ func main() {
 			},
 
 			"pubkey": func(args ...interface{}) (interface{}, error) {
-				return b64.StdEncoding.EncodeToString(args[0].([]byte)), nil //todo:get public key
+
+				decoded, ok := args[0].([]byte)
+				if !ok {
+					return "", nil
+				}
+				if len(decoded) != 32 {
+					return "", nil
+				}
+				var p [32]byte
+				var s [32]byte
+				copy(s[:], decoded[:32])
+				curve25519.ScalarBaseMult(&p, &s)
+				return base64.StdEncoding.EncodeToString(p[:]), nil
 			},
 		},
 	}.Run()
@@ -104,46 +119,12 @@ func (mw *MyMainWindow) leftSectionMenu() []MenuItem {
 			Text: "+",
 			Items: []MenuItem{
 				Action{
-					Text: "Add empty tunnel",
-					// OnTriggered: mw.newAction_Triggered,
+					Text:        "Add empty tunnel",
+					OnTriggered: mw.newTunnel,
 				},
 				Action{
-					Text: "Import tunnel(s) from file...",
-					OnTriggered: func() {
-						dlg := new(walk.FileDialog)
-
-						dlg.Filter = "WireGuard tunnel files (*.zip;*.conf)|*.zip;*.conf"
-						dlg.Title = "Import tunnel file..."
-
-						if ok, err := dlg.ShowOpen(mw); err != nil {
-							log.Print(err)
-						} else if !ok {
-							return
-						}
-						b, err := ioutil.ReadFile(dlg.FilePath)
-						if err != nil {
-							walk.MsgBox(
-								mw,
-								fmt.Sprintf("The file couldn't be accessed:\n%v", err),
-								"Error",
-								walk.MsgBoxOK|walk.MsgBoxIconError)
-							return
-						}
-						filename := filepath.Base(dlg.FilePath)
-						fileWOExt := strings.TrimSuffix(filename, filepath.Ext(filename))
-						tunnel, err := readTunnelConfiguration(string(b), fileWOExt)
-						if err != nil {
-							walk.MsgBox(
-								mw,
-								fmt.Sprintf("The file couldn't be read:\n%v", err),
-								"Error",
-								walk.MsgBoxOK|walk.MsgBoxIconError)
-							return
-						}
-						mw.model.items = append(mw.model.items, tunnel)
-						mw.model.PublishItemsReset()
-						//updateDetails(mw)
-					},
+					Text:        "Import tunnel(s) from file...",
+					OnTriggered: mw.importTunnels,
 				},
 			},
 		},
@@ -152,8 +133,9 @@ func (mw *MyMainWindow) leftSectionMenu() []MenuItem {
 			OnTriggered: func() {
 				if cmd, err := RunRequestDialog(mw); err != nil {
 					log.Print(err)
-				} else if cmd == walk.DlgCmdOK {
-					//delete selected here
+				} else if i := mw.lb.CurrentIndex(); cmd == walk.DlgCmdOK && i > 0 {
+					mw.model.items = append(mw.model.items[:i], mw.model.items[i+1:]...)
+					mw.model.PublishItemsReset()
 				}
 			},
 		},
@@ -195,6 +177,93 @@ func (mw *MyMainWindow) leftSectionMenu() []MenuItem {
 			},
 		},
 	}
+}
+
+func (mw *MyMainWindow) newTunnel() {
+	mw.model.items = append(mw.model.items, TunnelConfiguration{Name: "unnamed"})
+	mw.model.PublishItemsReset()
+}
+
+func (mw *MyMainWindow) importTunnels() {
+	dlg := new(walk.FileDialog)
+
+	dlg.Filter = "WireGuard tunnel files (*.zip;*.conf)|*.zip;*.conf"
+	dlg.Title = "Import tunnel file..."
+
+	if ok, err := dlg.ShowOpen(mw); err != nil {
+		log.Print(err)
+	} else if !ok {
+		return
+	}
+	filename := filepath.Base(dlg.FilePath)
+	ext := filepath.Ext(filename)
+	switch ext {
+	case ".conf":
+		b, err := ioutil.ReadFile(dlg.FilePath)
+		if err != nil {
+			walk.MsgBox(
+				mw,
+				fmt.Sprintf("The file couldn't be accessed:\n%v", err),
+				"Error",
+				walk.MsgBoxOK|walk.MsgBoxIconError)
+			return
+		}
+		fileWOExt := strings.TrimSuffix(filename, ext)
+		tunnel, err := readTunnelConfiguration(string(b), fileWOExt)
+		if err != nil {
+			walk.MsgBox(
+				mw,
+				fmt.Sprintf("The file couldn't be read:\n%v", err),
+				"Error",
+				walk.MsgBoxOK|walk.MsgBoxIconError)
+			return
+		}
+		mw.model.items = append(mw.model.items, tunnel)
+	case ".zip":
+		z, err := zip.OpenReader(dlg.FilePath)
+		if err != nil {
+			walk.MsgBox(
+				mw,
+				fmt.Sprintf("The file couldn't be accessed:\n%v", err),
+				"Error",
+				walk.MsgBoxOK|walk.MsgBoxIconError)
+			return
+		}
+		defer z.Close()
+		for _, f := range z.File {
+			innerExt := filepath.Ext(f.Name)
+			innerWOExt := strings.TrimSuffix(f.Name, innerExt)
+			rc, err := f.Open()
+			if err != nil {
+				log.Fatal(err)
+			}
+			b, err := ioutil.ReadAll(rc)
+			if err != nil {
+				log.Fatal(err)
+			}
+			rc.Close()
+
+			tunnel, err := readTunnelConfiguration(string(b), innerWOExt)
+			if err != nil {
+				walk.MsgBox(
+					mw,
+					fmt.Sprintf("The file couldn't be read:\n%v", err),
+					"Error",
+					walk.MsgBoxOK|walk.MsgBoxIconError)
+				return
+			}
+			mw.model.items = append(mw.model.items, tunnel)
+		}
+	default:
+		walk.MsgBox(
+			mw,
+			fmt.Sprintf("Unrecognized file %v", filename),
+			"Error",
+			walk.MsgBoxOK|walk.MsgBoxIconError)
+		return
+
+	}
+	mw.model.PublishItemsReset()
 }
 
 func (mw *MyMainWindow) rightSection() []Widget {
@@ -314,7 +383,7 @@ func joinAddresses(adds []IPAddressRange) string {
 func updateDetails(mw *MyMainWindow) {
 }
 
-func (mw *MyMainWindow) lb_CurrentIndexChanged() {
+func (mw *MyMainWindow) currentIndexChanged() {
 
 	i := mw.lb.CurrentIndex()
 	mw.model.Current = mw.model.items[i]
